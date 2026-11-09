@@ -39,6 +39,7 @@ jobs:
 
       - name: Логи при падении
         if: failure()
+        continue-on-error: true
         run: |
           kubectl --context shiro-toy get pods
           kubectl --context shiro-toy describe deployment hello

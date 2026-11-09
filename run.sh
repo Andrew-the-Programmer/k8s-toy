@@ -20,13 +20,24 @@ deploy() {
 }
 
 check() {
-  k run hello-check --rm -i --restart=Never \
-    --image=busybox:1.36 -- \
-    wget -qO- http://hello/
+  k -n kube-system wait --for=condition=Ready pod \
+    -l k8s-app=kube-dns --timeout=120s
+
+  attempt=0
+  while [ "$attempt" -lt 5 ]; do
+    attempt=$((attempt + 1))
+    if timeout 60 kubectl --context "$PROFILE" run "hello-check-$attempt" \
+      --rm -i --restart=Never --image=busybox:1.36 -- \
+      wget -T 5 -t 1 -qO- http://hello/; then
+      return 0
+    fi
+    sleep 5
+  done
+  return 1
 }
 
 down() {
-  k delete -k manifests --ignore-not-found
+  k delete -k manifests --ignore-not-found || true
   minikube delete --profile "$PROFILE" || true
 }
 
