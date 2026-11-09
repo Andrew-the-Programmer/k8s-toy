@@ -4,7 +4,8 @@ set -eu
 cd "$(dirname "$0")"
 
 PROFILE=shiro-toy
-IMAGE=shiro-hello:dev
+IMAGE=${IMAGE:-shiro-hello:dev}
+BUILD=${BUILD:-1}
 
 k() { kubectl --context "$PROFILE" "$@"; }
 
@@ -13,9 +14,16 @@ up() {
 }
 
 deploy() {
-  minikube -p "$PROFILE" image build -t "$IMAGE" .
+  if [ "$BUILD" = 1 ]; then
+    minikube -p "$PROFILE" image build -t "$IMAGE" .
+  fi
   k apply -k manifests
-  k rollout restart deployment/hello
+  if [ "$BUILD" = 1 ]; then
+    k rollout restart deployment/hello
+  else
+    k patch deployment hello --type=merge -p \
+      "{\"spec\":{\"template\":{\"spec\":{\"imagePullSecrets\":[{\"name\":\"${PULL_SECRET:-ghcr}\"}],\"containers\":[{\"name\":\"hello\",\"image\":\"$IMAGE\"}]}}}}"
+  fi
   k rollout status deployment/hello --timeout=120s
 }
 
