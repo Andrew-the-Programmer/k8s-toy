@@ -24,7 +24,7 @@ jobs:
       - name: Установить minikube
         run: |
           curl -fsSL -o minikube \
-            https://storage.googleapis.com/minikube/releases/download/v1.38.1/minikube-linux-amd64
+            https://storage.googleapis.com/minikube/releases/v1.38.1/minikube-linux-amd64
           chmod +x minikube
           sudo install minikube /usr/local/bin/minikube
 
