@@ -26,20 +26,21 @@ test() {
 
   k apply -f manifests/test-job.yaml || exit 1
 
-  job_success=$(
-    k wait job/hello-test --timeout=3m \
-      --for=jsonpath='{.status.conditions[*].status}'=True \
-      -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}'
-  )
-  job_exit_code=$?
+  kubectl --context "$PROFILE" wait job/hello-test \
+    --timeout=3m --for=condition=Complete &
+  complete_pid=$!
+  kubectl --context "$PROFILE" wait job/hello-test \
+    --timeout=3m --for=condition=Failed &
+  failed_pid=$!
+
+  wait -n "$complete_pid" "$failed_pid"
+  kill "$complete_pid" "$failed_pid" 2>/dev/null
+  wait 2>/dev/null
 
   k logs job/hello-test || true
 
-  if [ $job_exit_code -eq 0 ] && [ "${job_success}" = "True" ]; then
-    return 0
-  else
-    return 1
-  fi
+  [ "$(k get job hello-test \
+    -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}')" = True ]
 }
 
 down() {
