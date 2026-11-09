@@ -11,7 +11,7 @@ class Handler(BaseHTTPRequestHandler):
             return
         self._send(
             {
-                "message": os.environ.get("MESSAGE", "hello"),
+                "message": "bad message",
                 "pod": os.environ.get("POD_NAME", "unknown"),
                 "version": os.environ.get("VERSION", "dev"),
             }
