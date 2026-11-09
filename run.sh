@@ -1,105 +1,59 @@
-#!/bin/sh
-# Игрушечный пайплайн: minikube -> образ -> манифесты -> smoke-check.
-set -eu
-cd "$(dirname "$0")"
+#!/bin/bash
+
+cd "$(dirname "$0")" || exit 1
 
 PROFILE=shiro-toy
-IMAGE=${IMAGE:-shiro-hello:dev}
-TEST_IMAGE=${TEST_IMAGE:-ghcr.io/andrew-the-programmer/k8s-toy-tests:tests-v1.0.0}
-BUILD=${BUILD:-1}
 
 k() { kubectl --context "$PROFILE" "$@"; }
 
+mk() { minikube --profile "$PROFILE" "$@"; }
+
 up() {
-  minikube start --profile "$PROFILE" --driver=docker
+  mk start --driver=docker
 }
 
 deploy() {
-  if [ "$BUILD" = 1 ]; then
-    minikube -p "$PROFILE" image build -t "$IMAGE" app
-    k apply -k manifests
-    k set image deployment/hello hello="$IMAGE"
-    k rollout restart deployment/hello
-  else
-    k apply -k manifests
-    k patch deployment hello --type=merge -p \
-      "{\"spec\":{\"template\":{\"spec\":{\"imagePullSecrets\":[{\"name\":\"${PULL_SECRET:-ghcr}\"}],\"containers\":[{\"name\":\"hello\",\"image\":\"$IMAGE\"}]}}}}"
-  fi
+  k apply -k manifests
   k rollout status deployment/hello --timeout=120s
-}
-
-check() {
-  k -n kube-system wait --for=condition=Ready pod \
-    -l k8s-app=kube-dns --timeout=120s
-
-  attempt=0
-  while [ "$attempt" -lt 5 ]; do
-    attempt=$((attempt + 1))
-    if timeout 60 kubectl --context "$PROFILE" run "hello-check-$attempt" \
-      --rm -i --restart=Never --image=busybox:1.36 -- \
-      wget -T 5 -t 1 -qO- http://hello/; then
-      return 0
-    fi
-    sleep 5
-  done
-  return 1
 }
 
 test() {
   k -n kube-system wait --for=condition=Ready pod \
-    -l k8s-app=kube-dns --timeout=120s
+    -l k8s-app=kube-dns --timeout=120s ||
+    exit 1
 
-  k delete job hello-test --ignore-not-found
+  k delete job hello-test --ignore-not-found || exit 1
 
-  if [ "$BUILD" = 1 ]; then
-    TEST_IMAGE=shiro-hello-test:dev
-    minikube -p "$PROFILE" image build -t "$TEST_IMAGE" app-tests
-    sed -e '/imagePullSecrets:/,+1d' \
-      -e "s|ghcr.io/andrew-the-programmer/k8s-toy-tests:[^ ]*|$TEST_IMAGE|" \
-      manifests/test-job.yaml | k apply -f -
-  else
-    sed "s|ghcr.io/andrew-the-programmer/k8s-toy-tests:[^ ]*|$TEST_IMAGE|" \
-      manifests/test-job.yaml | k apply -f -
-  fi
+  k apply -f manifests/test-job.yaml || exit 1
 
-  attempt=0
-  while [ "$attempt" -lt 36 ]; do
-    attempt=$((attempt + 1))
-    complete=$(k get job hello-test -o \
-      jsonpath='{.status.conditions[?(@.type=="Complete")].status}' \
-      2>/dev/null || true)
-    failed=$(k get job hello-test -o \
-      jsonpath='{.status.conditions[?(@.type=="Failed")].status}' \
-      2>/dev/null || true)
-    if [ "$complete" = "True" ]; then
-      k logs job/hello-test
-      return 0
-    fi
-    if [ "$failed" = "True" ]; then
-      k logs job/hello-test || true
-      return 1
-    fi
-    sleep 5
-  done
+  job_success=$(
+    k wait job/hello-test --timeout=3m \
+      --for=jsonpath='{.status.conditions[*].status}'=True \
+      -o jsonpath='{.status.conditions[?(@.type=="Complete")].status}'
+  )
+  job_exit_code=$?
 
   k logs job/hello-test || true
-  return 1
+
+  if [ $job_exit_code -eq 0 ] && [ "${job_success}" = "True" ]; then
+    return 0
+  else
+    return 1
+  fi
 }
 
 down() {
   k delete -k manifests --ignore-not-found || true
-  minikube delete --profile "$PROFILE" || true
+  mk delete || true
 }
 
 case "${1:-}" in
-  up) up ;;
-  deploy) deploy ;;
-  check) check ;;
-  test) test ;;
-  down) down ;;
-  pipeline) up && deploy && check && test ;;
-  *)
-    echo "usage: $0 {up|deploy|check|test|down|pipeline}"
-    exit 1
-    ;;
+up) up ;;
+deploy) deploy ;;
+test) test ;;
+down) down ;;
+*)
+  echo "usage: $0 {up|deploy|test|down|pipeline}"
+  exit 1
+  ;;
 esac

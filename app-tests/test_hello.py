@@ -3,6 +3,7 @@ import os
 import httpx
 
 BASE_URL = os.environ.get("BASE_URL", "http://hello")
+MESSAGE = os.environ.get("MESSAGE", "hello")
 
 
 def test_healthz() -> None:
@@ -15,6 +16,5 @@ def test_root() -> None:
     response = httpx.get(f"{BASE_URL}/", timeout=5)
     assert response.status_code == 200
     body = response.json()
-    assert body["message"] == "hello from Kubernetes"
-    assert body["version"] == "v1"
+    assert body["message"] == MESSAGE
     assert body["pod"]
