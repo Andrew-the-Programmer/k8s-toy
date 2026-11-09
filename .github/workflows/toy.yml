@@ -1,0 +1,49 @@
+name: toy
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: toy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  pipeline:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: azure/setup-kubectl@v4
+
+      - name: Установить minikube
+        run: |
+          curl -fsSL -o minikube \
+            https://storage.googleapis.com/minikube/releases/download/v1.38.1/minikube-linux-amd64
+          chmod +x minikube
+          sudo install minikube /usr/local/bin/minikube
+
+      - name: Запустить кластер
+        run: ./run.sh up
+
+      - name: Собрать и задеплоить
+        run: ./run.sh deploy
+
+      - name: Smoke-check
+        run: ./run.sh check
+
+      - name: Логи при падении
+        if: failure()
+        run: |
+          kubectl --context shiro-toy get pods
+          kubectl --context shiro-toy describe deployment hello
+          kubectl --context shiro-toy logs deployment/hello --tail=50
+
+      - name: Удалить кластер
+        if: always()
+        run: ./run.sh down
