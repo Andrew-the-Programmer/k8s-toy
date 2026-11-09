@@ -26,7 +26,7 @@ spec:
               done
       containers:
         - name: pytest
-          image: ghcr.io/andrew-the-programmer/k8s-toy-tests:tests-v1.0.0
+          image: ghcr.io/andrew-the-programmer/k8s-toy-tests:tests-v1
           imagePullPolicy: IfNotPresent
           env:
             - name: BASE_URL
