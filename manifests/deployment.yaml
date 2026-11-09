@@ -18,7 +18,7 @@ spec:
         runAsNonRoot: true
       containers:
         - name: hello
-          image: shiro-hello:dev
+          image: ghcr.io/andrew-the-programmer/k8s-toy-app:app-v1.0.0
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080

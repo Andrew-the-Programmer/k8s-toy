@@ -1,0 +1,91 @@
+name: Build and push docker to ghcr.io
+
+on:
+  push:
+    tags:
+      - "app-v*"
+      - "tests-v*"
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  app:
+    if: startsWith(github.ref_name, 'app-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Lowercase image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}-app" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=tag
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: app
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
+
+  tests:
+    if: startsWith(github.ref_name, 'tests-v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Lowercase image name
+        run: echo "IMAGE=ghcr.io/${GITHUB_REPOSITORY,,}-tests" >> "$GITHUB_ENV"
+
+      - uses: docker/login-action@v4
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v6
+        with:
+          images: ${{ env.IMAGE }}
+          tags: |
+            type=ref,event=tag
+
+      - uses: docker/build-push-action@v7
+        with:
+          context: app-tests
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          generate_release_notes: true
