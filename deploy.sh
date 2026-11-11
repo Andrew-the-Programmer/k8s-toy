@@ -48,11 +48,6 @@ join_cluster() {
   : "${K3S_URL:?set K3S_URL, printed by deploy.sh init_cluster}"
   : "${K3S_TOKEN:?set K3S_TOKEN, printed by deploy.sh init_cluster}"
 
-  if command -v k3s >/dev/null; then
-    echo "k3s is already installed here; join_cluster installs a new agent only" >&2
-    exit 1
-  fi
-
   curl -sfL https://get.k3s.io |
     K3S_URL="$K3S_URL" K3S_TOKEN="$K3S_TOKEN" \
     INSTALL_K3S_VERSION="$K3S_VERSION" \
