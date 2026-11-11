@@ -8,7 +8,7 @@ ARGOCD_VERSION=v3.6.1
 
 k() { sudo k3s kubectl "$@"; }
 
-init() {
+init_cluster() {
   if ! command -v k3s >/dev/null; then
     # Caddy already owns 80/443 on this machine.
     curl -sfL https://get.k3s.io |
@@ -25,43 +25,55 @@ init() {
     "https://raw.githubusercontent.com/argoproj/argo-cd/$ARGOCD_VERSION/manifests/install.yaml"
   k -n argocd rollout status deploy/argocd-server --timeout=300s
 
-  k apply -f argocd/app.yaml
-
   ip=$(k get nodes -o jsonpath='{range .items[0].status.addresses[?(@.type=="InternalIP")]}{.address}{"\n"}{end}' | head -n1)
   token=$(sudo cat /var/lib/rancher/k3s/server/node-token)
 
   echo "
 Argo CD panel:
-  sudo k3s kubectl -n argocd port-forward svc/argocd-server 8080:443
-  https://localhost:8080  admin
+  sudo k3s kubectl -n argocd port-forward svc/argocd-server 18080:443 --address 127.0.0.1
+  ssh -L 18080:127.0.0.1:18080 <this server>   # any free local port works
+  https://localhost:18080  admin
   password: sudo k3s kubectl -n argocd get secret argocd-initial-admin-secret -o jsonpath='{.data.password}' | base64 -d
 
 new server:
   git clone git@github.com:Andrew-the-Programmer/k8s-toy.git
-  K3S_URL=https://$ip:6443 K3S_TOKEN=$token ./deploy.sh --profile app"
+  K3S_URL=https://$ip:6443 K3S_TOKEN=$token ./deploy.sh join_cluster --profile hello
+
+run an app on the profile nodes (from this server):
+  ./deploy.sh run --profile hello"
 }
 
-join() {
+join_cluster() {
   profile=$1
-  : "${K3S_URL:?set K3S_URL, printed by deploy.sh init on main}"
-  : "${K3S_TOKEN:?set K3S_TOKEN, printed by deploy.sh init on main}"
+  : "${K3S_URL:?set K3S_URL, printed by deploy.sh init_cluster}"
+  : "${K3S_TOKEN:?set K3S_TOKEN, printed by deploy.sh init_cluster}"
 
-  if ! command -v k3s >/dev/null; then
-    curl -sfL https://get.k3s.io |
-      K3S_URL="$K3S_URL" K3S_TOKEN="$K3S_TOKEN" \
-      INSTALL_K3S_VERSION="$K3S_VERSION" \
-      INSTALL_K3S_EXEC="agent --node-label shiro.io/profile=$profile" sh -
+  if command -v k3s >/dev/null; then
+    echo "k3s is already installed here; join_cluster installs a new agent only" >&2
+    exit 1
   fi
+
+  curl -sfL https://get.k3s.io |
+    K3S_URL="$K3S_URL" K3S_TOKEN="$K3S_TOKEN" \
+    INSTALL_K3S_VERSION="$K3S_VERSION" \
+    INSTALL_K3S_EXEC="agent --node-label shiro.io/profile=$profile" sh -
   sudo systemctl enable --now k3s-agent
 
   echo "joined $K3S_URL as shiro.io/profile=$profile"
 }
 
+run() {
+  profile=$1
+  k apply -f "argocd/$profile.yaml"
+  k -n argocd get application "$profile"
+}
+
 case "${1:-}" in
-init) init ;;
---profile) join "${2:?usage: $0 --profile <name>}" ;;
+init_cluster) init_cluster ;;
+join_cluster) join_cluster "${3:?usage: $0 join_cluster --profile <name>}" ;;
+run) run "${3:?usage: $0 run --profile <name>}" ;;
 *)
-  echo "usage: $0 init | $0 --profile <name>"
+  echo "usage: $0 init_cluster | join_cluster --profile <name> | run --profile <name>"
   exit 1
   ;;
 esac

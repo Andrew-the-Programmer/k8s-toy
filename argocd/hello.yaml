@@ -8,7 +8,7 @@ spec:
   source:
     repoURL: https://github.com/Andrew-the-Programmer/k8s-toy.git
     targetRevision: main
-    path: manifests
+    path: overlays/hello
   destination:
     server: https://kubernetes.default.svc
     namespace: default
