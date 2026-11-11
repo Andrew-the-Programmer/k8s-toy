@@ -16,7 +16,9 @@ init() {
       INSTALL_K3S_EXEC="server --disable=traefik --disable=servicelb" sh -
   fi
   sudo systemctl enable --now k3s
-  k wait --for=condition=Ready node --all --timeout=120s
+  node=$(hostname)
+  k wait --for=create node/"$node" --timeout=120s
+  k wait --for=condition=Ready node/"$node" --timeout=120s
 
   k create namespace argocd --dry-run=client -o yaml | k apply -f -
   k apply --server-side -n argocd -f \
