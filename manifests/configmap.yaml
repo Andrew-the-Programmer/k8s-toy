@@ -3,4 +3,4 @@ kind: ConfigMap
 metadata:
   name: hello-config
 data:
-  message: "hello from Kubernetes"
+  message: "hello from Argo CD"
