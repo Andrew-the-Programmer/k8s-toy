@@ -19,7 +19,7 @@ init() {
   k wait --for=condition=Ready node --all --timeout=120s
 
   k create namespace argocd --dry-run=client -o yaml | k apply -f -
-  k apply -n argocd -f \
+  k apply --server-side -n argocd -f \
     "https://raw.githubusercontent.com/argoproj/argo-cd/$ARGOCD_VERSION/manifests/install.yaml"
   k -n argocd rollout status deploy/argocd-server --timeout=300s
 
