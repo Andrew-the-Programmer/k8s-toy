@@ -3,13 +3,15 @@ kind: Kustomization
 
 resources:
   - ../../manifests
+  - daemonset.yaml
 
 patches:
   - target:
       kind: Deployment
       name: hello
     patch: |-
-      - op: add
-        path: /spec/template/spec/nodeSelector
-        value:
-          shiro.io/profile: hello
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: hello
+      $patch: delete
