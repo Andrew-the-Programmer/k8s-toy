@@ -1,9 +1,7 @@
 name: toy
 
 on:
-  pull_request:
-  push:
-    branches: [main]
+  pull_request
 
 concurrency:
   group: toy-${{ github.ref }}
