@@ -27,7 +27,7 @@ init() {
 
   k apply -f argocd/app.yaml
 
-  ip=$(k get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}')
+  ip=$(k get nodes -o jsonpath='{range .items[0].status.addresses[?(@.type=="InternalIP")]}{.address}{"\n"}{end}' | head -n1)
   token=$(sudo cat /var/lib/rancher/k3s/server/node-token)
 
   echo "
